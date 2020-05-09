@@ -18,28 +18,26 @@ func NewPatcher(config PatcherConfig) *Patcher {
   }
 }
 
-// Patch performs a patch operation on "dest", using the data in "patch". Patch returns a PatchResult if sucessful, or an error if not.
+// Patch performs a patch operation on "dest", using the data in "patch". Patch returns a PatchResult if sucessful, or an error if not. Patch can
+// also patch embedded structs and pointers to embedded structs. If a patch exists for a nil embedded struct pointer, the pointer will be assigned a
+// new zero-value struct before it is patched.
 func (p Patcher) Patch(dest interface{}, patch map[string]interface{}) (*PatchResult, error) {
 
+  // Error on invalid dest.
+  if reflect.ValueOf(dest).Kind() != reflect.Ptr ||
+    reflect.ValueOf(dest).IsNil() ||
+    reflect.ValueOf(dest).Elem().Kind() != reflect.Struct {
+    
+    return nil, errDestInvalid
+  }
   return p.patch(dest, patch, p.config.PermittedFields, "")
 }
 
 func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted []string, path string) (*PatchResult, error) {
-
-  // Get the reflect value of `dest` and test that is a pointer.
-  valueOfDest := reflect.ValueOf(dest)
-  if valueOfDest.Kind() != reflect.Ptr {
-    return nil, errDestinationMustBePointerType
-  }
   
-  // Get the actual struct data from the pointer and its type data
-  valueOfDest = valueOfDest.Elem()
+  // Get the actual struct data from the pointer and its type data.
+  valueOfDest := reflect.ValueOf(dest).Elem()
   typeOfDest := valueOfDest.Type()
-  
-  // Ensure the type is in fact a struct.
-  if typeOfDest.Kind() != reflect.Struct {
-    return nil, errDestinationMustBeStructType
-  }
   
   // Initialize and allocate space for the results.
   results := PatchResult{
@@ -112,57 +110,64 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
       if fieldV.Kind() == v.Kind() {
         fieldV.Set(v)
         
-        // TODO: Add data about the successful update to the results.
+        // Add data about the successful update to the results.
+        if err := p.saveToResults(&results, fieldT, val, path); err != nil { return nil, err }
 
-      // Else, if the kind is struct,
-      } else if fieldV.Kind() == reflect.Struct {
+        // Next!
+        continue
+      }
+
+      // Check updater functions for a match.
+      updateSuccess := false
+      for _, updater := range Updaters {
+
+        // Try to update, breaking if successful
+        if updateSuccess = updater(fieldV, v); updateSuccess { break }
+      }
+      if updateSuccess {
+
+        // Add data about the successful update to the results.
+        if err := p.saveToResults(&results, fieldT, val, path); err != nil { return nil, err }
+
+        // Next!
+        continue
+      }
+
+      // Dereference the value if it's a pointer.
+      if fieldV.Kind() == reflect.Ptr {
+
+        // Ensure it's not nil, initializing to zero-value if needed.
+        if fieldV.IsNil() {
+          fieldV.Set(reflect.New(fieldV.Type().Elem()))
+        }
+
+        fieldV = fieldV.Elem()
+      }
+
+      // If the value is a struct, attempt to deep-patch it.
+      if fieldV.Kind() == reflect.Struct {
 
         // If the map field's kind isn't map[string]interface{}, skip it.
         if v.Kind() != reflect.Map || v.Type().Key().Kind() != reflect.String || v.Type().Elem().Kind() != reflect.Interface { continue }
         
         // If the gopatch tag specifies "replace", reset the current field value to its zero value.
-        if fieldT.Tag.Get("gopatch") == "replace" {
+        replace := fieldT.Tag.Get("gopatch") == "replace"
+        if replace {
           fieldV.Set(reflect.Zero(fieldT.Type))
         }
 
         // Patch the field, even if it was reset, by recursion.
         if !fieldV.CanAddr() { continue }
-        prepend := path
-        if prepend != "" { prepend += "."+fieldName } else { prepend = fieldName }
-        /*results, err :=*/ p.patch(fieldV.Addr(), val.(map[string]interface{}), getPermittedAtPath(permitted, prepend), prepend)
+        full := path
+        if full != "" { full += "."+fieldName } else { full = fieldName }
+        if replace { full = "" }
+        deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedAtPath(permitted, full), full)
 
-        // TODO: Add data about the successful update to the results.
+        // If an error occurred while deep-patching, bubble up immediately.
+        if err != nil { return nil, err }
 
-      // Else, if the kind is ptr and the Elem type is struct,
-      } else if fieldV.Kind() == reflect.Ptr && fieldV.Elem().Kind() == reflect.Struct {
-
-        // If the map field's kind isn't map[string]interface{}, skip it.
-        if v.Kind() != reflect.Map || v.Type().Key().Kind() != reflect.String || v.Type().Elem().Kind() != reflect.Interface { continue }
-        
-        // If the gopatch tag specifies "replace", reset the current field value to its zero value.
-        if fieldT.Tag.Get("gopatch") == "replace" {
-          fieldV.Set(reflect.Zero(fieldT.Type))
-        }
-
-        // Patch the field, even if it was reset, by recursion.
-        if !fieldV.CanAddr() { continue }
-        prepend := path
-        if prepend != "" { prepend += "."+fieldName } else { prepend = fieldName }
-        /*results, err :=*/ p.patch(fieldV, val.(map[string]interface{}), getPermittedAtPath(permitted, prepend), prepend)
-
-        // TODO: Add data about the successful update to the results.
-        
-      // Else, try to match the kind via the updaters.
-      } else {
-
-        updateSuccess := false
-        for _, updater := range Updaters {
-
-          // Try to update, breaking if successful
-          if updateSuccess = updater(fieldV, v); updateSuccess { break }
-        }
-
-        // TODO: Add data about the successful update to the results.
+        // Merge deep-patched results into the current results.
+        if err := p.mergeResults(&results, deep, fieldT, replace, path); err != nil { return nil, err }
       }
     }
   }
@@ -170,7 +175,89 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
   return &results, nil
 }
 
-func (p *Patcher) saveToResults(r *PatchResult, val reflect.Value) error {
+func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch interface{}, path string) error {
+
+  // Get a field name for the fields array.
+  fieldName := dest.Name
+  if p.config.UpdatedFieldSource != "" && p.config.UpdatedFieldSource != "struct" {
+    
+    testFieldName := dest.Tag.Get(p.config.UpdatedFieldSource)
+    if fieldName != "" {
+      fieldName = testFieldName
+    } else if p.config.UpdatedFieldErrors {
+      return errFieldMissingTag(fieldName, p.config.UpdatedFieldSource)
+    }
+  }
+
+  // Append.
+  r.Fields = append(r.Fields, fieldName)
+
+  // Get a field name for the map.
+  fieldName = dest.Name
+  if p.config.UpdatedMapSource != "" && p.config.UpdatedMapSource != "struct" {
+    
+    testFieldName := dest.Tag.Get(p.config.UpdatedMapSource)
+    if fieldName != "" {
+      fieldName = testFieldName
+    } else if p.config.UpdatedMapErrors {
+      return errFieldMissingTag(fieldName, p.config.UpdatedMapSource)
+    }
+  }
+
+  // Add to map, prepended with a path if specified, otherwise with only the field name.
+  if path == "" { r.Map[fieldName] = patch } else { r.Map[path+"."+fieldName] = patch }
+
+  return nil
+}
+
+func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField, replace bool, path string) error {
+
+  // Get a field name for the fields array.
+  fieldName := dest.Name
+  if p.config.UpdatedFieldSource != "" && p.config.UpdatedFieldSource != "struct" {
+    
+    testFieldName := dest.Tag.Get(p.config.UpdatedFieldSource)
+    if fieldName != "" {
+      fieldName = testFieldName
+    } else if p.config.UpdatedFieldErrors {
+      return errFieldMissingTag(fieldName, p.config.UpdatedFieldSource)
+    }
+  }
+
+  full := path
+  if full != "" { full += "."+fieldName } else { full = fieldName }
+
+  // Map field names to path and append.
+  if replace {
+    top.Fields = append(top.Fields, path+"."+fieldName)
+  } else {
+    for _, field := range(deep.Fields) {
+      top.Fields = append(top.Fields, full+"."+field)
+    }
+  }
+
+  // Get a field name for the map.
+  fieldName = dest.Name
+  if p.config.UpdatedMapSource != "" && p.config.UpdatedMapSource != "struct" {
+    
+    testFieldName := dest.Tag.Get(p.config.UpdatedMapSource)
+    if fieldName != "" {
+      fieldName = testFieldName
+    } else if p.config.UpdatedMapErrors {
+      return errFieldMissingTag(fieldName, p.config.UpdatedMapSource)
+    }
+  }
+
+  full = path
+  if full != "" { full += "."+fieldName } else { full = fieldName }
+
+  if replace {
+    top.Map[full] = deep.Map
+  } else {
+    for k, v := range(deep.Map) {
+      top.Map[full+"."+k] = v
+    }
+  }
 
   return nil
 }

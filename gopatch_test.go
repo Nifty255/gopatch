@@ -7,6 +7,20 @@ import(
 
 func TestDefault(t *testing.T) {
 
+  type TestEmbedded struct {
+    Field1  string
+    Field2  int
+    Field3  bool
+  }
+
+  type TestStruct struct {
+    Field1  string
+    Field2  int
+    Field3  bool
+    Field4  TestEmbedded
+    Field5  *TestEmbedded
+  }
+
   t.Run("default-has-default-config", func(t *testing.T) {
 
     patcher := Default()
@@ -63,13 +77,7 @@ func TestDefault(t *testing.T) {
     }
   })
 
-  t.Run("default-patches", func(t *testing.T) {
-
-    type TestStruct struct {
-      Field1  string
-      Field2  int
-      Field3  bool
-    }
+  t.Run("default-top-level-patches", func(t *testing.T) {
 
     testInstance := TestStruct{}
 
@@ -92,6 +100,64 @@ func TestDefault(t *testing.T) {
     // Test to see if the instance was patched.
     if len(result.Fields) != 1 || result.Fields[0] != "Field2" {
       t.Errorf("Expected patch result fields to contain exactly \"Field2\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+  })
+
+  t.Run("default-embedded-patches", func(t *testing.T) {
+
+    testInstance := TestStruct{}
+
+    result, err := Default().Patch(&testInstance, map[string]interface{}{
+      "Field4": map[string]interface{}{
+        "Field1": "test",
+      },
+    })
+
+    // Test for unexpected errors.
+    if err != nil {
+      t.Errorf("Unexpected patch error: %q", err.Error())
+      return
+    }
+
+    // Test to see if the instance was patched.
+    if testInstance.Field4.Field1 != "test" || testInstance.Field4.Field2 != 0 || testInstance.Field4.Field3 {
+      t.Errorf("Expected patch to only patch Field5.Field1. Patch affected struct so: %v", testInstance)
+      return
+    }
+
+    // Test to see if the instance was patched.
+    if len(result.Fields) != 1 || result.Fields[0] != "Field4.Field1" {
+      t.Errorf("Expected patch result fields to contain exactly \"Field4.Field1\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+  })
+
+  t.Run("default-pointer-patches", func(t *testing.T) {
+
+    testInstance := TestStruct{}
+
+    result, err := Default().Patch(&testInstance, map[string]interface{}{
+      "Field5": map[string]interface{}{
+        "Field1": "test",
+      },
+    })
+
+    // Test for unexpected errors.
+    if err != nil {
+      t.Errorf("Unexpected patch error: %q", err.Error())
+      return
+    }
+
+    // Test to see if the instance was patched.
+    if testInstance.Field5 == nil || testInstance.Field5.Field1 != "test" || testInstance.Field5.Field2 != 0 || testInstance.Field5.Field3 {
+      t.Errorf("Expected patch to only patch Field5.Field1. Patch affected struct so: %v", testInstance)
+      return
+    }
+
+    // Test to see if the instance was patched.
+    if len(result.Fields) != 1 || result.Fields[0] != "Field5.Field1" {
+      t.Errorf("Expected patch result fields to contain exactly \"Field5.Field1\". Contained [%v]", strings.Join(result.Fields, ", "))
       return
     }
   })

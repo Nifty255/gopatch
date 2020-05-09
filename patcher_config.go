@@ -29,20 +29,15 @@ type PatcherConfig struct {
   // struct's field names. For any other value, the patcher will match
   // based on the struct fields' matching tags.
   //
-  // Valid options are:
-  // - <empty> (uses "struct")
-  // = "bson"
-  // - "json"
-  // - "mapstructure"
-  // - "msgpack"
-  //
-  // All other values will cause a panic. Is something missing?
-  // Create an issue!
+  // An empty or "struct" value will use the field's Go-based name.
+  // Use of any other value will cause the patcher to search for that tag.
+  // Common values include "json", "bson", "msgpack", and "mapstructure"
   PatchSource string
 
   // PatchErrors causes the Patcher to immediately return an error if a
   // field is encountered which isn't tagged with the one passed to
-  // PatchSource. Defaults to false.
+  // PatchSource, and PatchSource is not empty or "struct". Defaults to
+  // false.
   //
   // WARNING: Using this option may result in half-patched structures!
   // Only use this if you don't have further use of the half-patched
@@ -55,20 +50,15 @@ type PatcherConfig struct {
   // field. For any other value, the patcher will look for the related
   // tag and use its value.
   //
-  // Valid options are:
-  // - <empty> (uses "struct")
-  // = "bson"
-  // - "json"
-  // - "mapstructure"
-  // - "msgpack"
-  //
-  // All other values will cause a panic. Is something missing?
-  // Create an issue!
+  // An empty or "struct" value will use the field's Go-based name.
+  // Use of any other value will cause the patcher to search for that tag.
+  // Common values include "json", "bson", "msgpack", and "mapstructure"
   UpdatedMapSource string
 
   // UpdatedMapErrors causes the Patcher to immediately return an error
   // if a field is encountered which isn't tagged with the one passed to
-  // UpdatedMapSource. Defaults to false.
+  // UpdatedMapSource, and UpdatedMapSource is not empty or "struct".
+  // Defaults to false.
   //
   // WARNING: Using this option may result in half-patched structures!
   // Only use this if you don't have further use of the half-patched
@@ -81,20 +71,15 @@ type PatcherConfig struct {
   // the name of the struct field. For any other value, the patcher
   // will look for the related tag and use its value.
   //
-  // Valid options are:
-  // - <empty> (uses "struct")
-  // = "bson"
-  // - "json"
-  // - "mapstructure"
-  // - "msgpack"
-  //
-  // All other values will cause a panic. Is something missing?
-  // Create an issue!
+  // An empty or "struct" value will use the field's Go-based name.
+  // Use of any other value will cause the patcher to search for that tag.
+  // Common values include "json", "bson", "msgpack", and "mapstructure"
   UpdatedFieldSource string
 
   // UpdatedFieldErrors causes the Patcher to immediately return an error
   // if a field is encountered which isn't tagged with the one passed to
-  // UpdatedFieldSource. Defaults to false.
+  // UpdatedFieldSource, and UpdatedFieldSource is not empty or "struct".
+  // Defaults to false.
   //
   // WARNING: Using this option may result in half-patched structures!
   // Only use this if you don't have further use of the half-patched
