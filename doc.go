@@ -62,7 +62,7 @@
 //     
 //       ID           int     `json:"id"        gopatch:"-"`        // NEVER patch this field, even if permitted in configuration.
 //     
-//       Username string      `json:"username"`                     // No gopatch tag allows normal patching behavior.
+//       Username string      `json:"username"`                     // No gopatch tag allows normal patching behavior, acts like "patch" for structs.
 //     
 //       Profile  UserProfile `json:"profile"   gopatch:"patch"`    // Patch data for Profile will patch the fields inside.
 //     

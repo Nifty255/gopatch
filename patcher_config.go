@@ -40,6 +40,15 @@ type PatcherConfig struct {
   // Create an issue!
   PatchSource string
 
+  // PatchErrors causes the Patcher to immediately return an error if a
+  // field is encountered which isn't tagged with the one passed to
+  // PatchSource. Defaults to false.
+  //
+  // WARNING: Using this option may result in half-patched structures!
+  // Only use this if you don't have further use of the half-patched
+  // structure or can reload it afterwards.
+  PatchErrors bool
+
   // UpdatedMapSource, defaulting to "struct" when empty, determines from
   // which source a field name comes when creating the PatchResult.Map
   // map. For "struct", the field string will be the name of the struct
