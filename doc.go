@@ -38,7 +38,7 @@
 // Field Name Sources
 //
 // Struct field names on Go often differ from field names of counterpart object representations such as JSON and BSON. This package refers to these
-// representations as "Field Name Sources". In the above examples, the User struct's EmailAddress has a "struct" field name source ( resulting in the
+// representations as "Field Name Sources". In the above examples, the User struct's EmailAddress has a "struct" field name source (resulting in the
 // field name "EmailAddress"), and a "json" field name source (resulting in the field name "email_address"). Thus, if you want to patch a struct from
 // a map built from JSON bytes, you need to add json tags AND configure your Patcher to use the struct's "json" field name sources. In the second
 // example above, you can see the Patcher has been configured with the "json" field name source and thuse can use a JSON-derived map to patch.
