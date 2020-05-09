@@ -30,7 +30,7 @@ func (p Patcher) Patch(dest interface{}, patch map[string]interface{}) (*PatchRe
     
     return nil, errDestInvalid
   }
-  return p.patch(dest, patch, p.config.PermittedFields, "")
+  return p.patch(dest, patch, p.config.PermittedFields, p.config.EmbedPath)
 }
 
 func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted []string, path string) (*PatchResult, error) {
