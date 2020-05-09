@@ -8,7 +8,7 @@ type PatchResult struct {
 
   // Fields is a lost of field names which were successfully patched. If
   // the Patcher's configured UpdatedFieldSource is empty or  "struct",
-  // these names will be sourced from the struct. Othesie,  the Patcher
+  // these names will be sourced from the struct. Otherwise, the Patcher
   // will attempt to find them from the field's tags related to the
   // configured source.
   Fields []string
