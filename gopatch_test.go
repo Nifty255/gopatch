@@ -104,12 +104,6 @@ func TestDefault(t *testing.T) {
       return
     }
 
-    // Test to see if the resulting field list is correct.
-    if len(result.Fields) != 1 || result.Fields[0] != "Field2" {
-      t.Errorf("Expected patch result fields to contain exactly \"Field2\". Contained [%v]", strings.Join(result.Fields, ", "))
-      return
-    }
-
     // Test to see if the resulting update map is correct.
     if v, e := result.Map["Field2"]; !e || v != 255 {
       t.Errorf("Expected patch result map to contain exactly \"Field2\": 255. Contained %v", result.Map)
