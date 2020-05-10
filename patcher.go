@@ -62,47 +62,52 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
     if p.config.PatchSource != "" && p.config.PatchSource != "struct" {
       
       testFieldName := fieldT.Tag.Get(p.config.PatchSource)
-      if fieldName != "" {
+      if testFieldName != "" {
         fieldName = testFieldName
       } else if p.config.PatchErrors {
         return nil, errFieldMissingTag(fieldName, p.config.PatchSource)
       }
     }
 
-    // Check that the field isn't unpermitted by tag. Doing this before checking the permitted list placed priority on the tag.
-    if fieldT.Tag.Get("gopatch") == "-" {
-      if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
-      continue
-    }
-
-    // Check that the field is permitted by the array, or the permitted array is empty.
-    if p.config.PermittedFields != nil && len(p.config.PermittedFields) > 0 {
-
-      allowed := false
-      for _, permit := range(permitted) {
-
-        // Break if it's an asterisk. It's auto-permitted.
-        if permit == "*" {
-          allowed = true
-          break
-        }
-
-        // Permit if exact match or "match.*".
-        if permit == fieldName ||  permit == fieldName+".*" {
-          allowed = true
-          break
-        }
-      }
-
-      // Skip field or error if it wasn't permitted.
-      if !allowed {
-        if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
-        continue
-      }
-    }
-
     // Get the patch value based on the fieldName.
     if val, ok := patch[fieldName]; ok {
+
+      full := path
+      if full != "" { full += "."+fieldName } else { full = fieldName }
+
+      // Check that the field isn't unpermitted by tag. Doing this before checking the permitted list placed priority on the tag.
+      if fieldT.Tag.Get("gopatch") == "-" {
+        if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
+        results.Unpermitted = append(results.Unpermitted, full)
+        continue
+      }
+
+      // Check that the field is permitted by the array, or the permitted array is empty.
+      if p.config.PermittedFields != nil && len(p.config.PermittedFields) > 0 {
+
+        allowed := false
+        for _, permit := range(permitted) {
+
+          // Break if it's an asterisk. It's auto-permitted.
+          if permit == "*" {
+            allowed = true
+            break
+          }
+
+          // Permit if exact match or "match.*".
+          if permit == fieldName ||  permit == fieldName+".*" {
+            allowed = true
+            break
+          }
+        }
+
+        // Skip field or error if it wasn't permitted.
+        if !allowed {
+          if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
+          results.Unpermitted = append(results.Unpermitted, full)
+          continue
+        }
+      }
 
       v := reflect.ValueOf(val)
 
@@ -158,8 +163,6 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
 
         // Patch the field, even if it was reset, by recursion.
         if !fieldV.CanAddr() { continue }
-        full := path
-        if full != "" { full += "."+fieldName } else { full = fieldName }
         deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedAtPath(permitted, full), path)
 
         // If an error occurred while deep-patching, bubble up immediately.
@@ -181,7 +184,7 @@ func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch 
   if p.config.UpdatedFieldSource != "" && p.config.UpdatedFieldSource != "struct" {
     
     testFieldName := dest.Tag.Get(p.config.UpdatedFieldSource)
-    if fieldName != "" {
+    if testFieldName != "" {
       fieldName = testFieldName
     } else if p.config.UpdatedFieldErrors {
       return errFieldMissingTag(fieldName, p.config.UpdatedFieldSource)
@@ -196,7 +199,7 @@ func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch 
   if p.config.UpdatedMapSource != "" && p.config.UpdatedMapSource != "struct" {
     
     testFieldName := dest.Tag.Get(p.config.UpdatedMapSource)
-    if fieldName != "" {
+    if testFieldName != "" {
       fieldName = testFieldName
     } else if p.config.UpdatedMapErrors {
       return errFieldMissingTag(fieldName, p.config.UpdatedMapSource)
@@ -216,7 +219,7 @@ func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField,
   if p.config.UpdatedFieldSource != "" && p.config.UpdatedFieldSource != "struct" {
     
     testFieldName := dest.Tag.Get(p.config.UpdatedFieldSource)
-    if fieldName != "" {
+    if testFieldName != "" {
       fieldName = testFieldName
     } else if p.config.UpdatedFieldErrors {
       return errFieldMissingTag(fieldName, p.config.UpdatedFieldSource)
@@ -240,7 +243,7 @@ func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField,
   if p.config.UpdatedMapSource != "" && p.config.UpdatedMapSource != "struct" {
     
     testFieldName := dest.Tag.Get(p.config.UpdatedMapSource)
-    if fieldName != "" {
+    if testFieldName != "" {
       fieldName = testFieldName
     } else if p.config.UpdatedMapErrors {
       return errFieldMissingTag(fieldName, p.config.UpdatedMapSource)
