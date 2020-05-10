@@ -8,13 +8,18 @@ import (
   "github.com/guregu/null"
 )
 
-// MapStringInterfaceUpdater updates map[string]interface{}
-func MapStringInterfaceUpdater(fieldValue reflect.Value, v reflect.Value) bool {
-  // if fieldValue.Kind() == reflect.Struct {
-  //   // @TODO: right now, do nothing
-  //   return false
-  // }
-  return false
+// MapUpdater updates any map as long as the key and element values match.
+func MapUpdater(fieldValue reflect.Value, v reflect.Value) bool {
+  if fieldValue.Kind() != reflect.Map { return false }
+  if fieldValue.Type().Key().Kind() != v.Type().Key().Kind() { return false }
+  if fieldValue.Type().Elem().Kind() != v.Type().Elem().Kind() {
+    if !v.Type().ConvertibleTo(fieldValue.Type()) { return false }
+
+    fieldValue.Set(v.Convert(fieldValue.Type()))
+  }
+  
+  fieldValue.Set(v)
+  return true
 }
 
 // NullStringUpdater updates null.String
@@ -405,7 +410,7 @@ var Updaters = []func(reflect.Value, reflect.Value) bool{
   NullIntUpdater,
   NullBoolUpdater,
   NullTimeUpdater,
-  MapStringInterfaceUpdater,
+  MapUpdater,
   IntUpdater,
   FloatUpdater,
   TimeUpdater,

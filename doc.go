@@ -35,6 +35,14 @@
 //     
 //     // err != nil
 //
+// Some Limitations
+//
+// Currently, gopatch cannot patch maps, and cannot replace maps not of the same key AND value types. Additionally, gopatch cannot patch or replace
+// slices/arrays. Maps not of the same key and value types as well as all slices are currently skipped without error. However, it's easy to hook your
+// own patch/replace logic by adding a custom Updater function to `gopatch.Updaters`. Note that these functions are run first to last, so you'll need
+// to inject your function like so: `gopatch.Updaters = append(myUpdater, gopatch.Updaters...)`. Suggestions on how to remove these limitations are
+// welcome. Please add an issue or make a pull request!
+//
 // Field Name Sources
 //
 // Struct field names on Go often differ from field names of counterpart object representations such as JSON and BSON. This package refers to these

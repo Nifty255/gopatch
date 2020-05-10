@@ -107,7 +107,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
       v := reflect.ValueOf(val)
 
       // Easily assign the value if both ends' kinds are the same
-      if fieldV.Kind() == v.Kind() {
+      if fieldV.Kind() == v.Kind() && fieldV.Kind() != reflect.Map {
         fieldV.Set(v)
         
         // Add data about the successful update to the results.
@@ -160,8 +160,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
         if !fieldV.CanAddr() { continue }
         full := path
         if full != "" { full += "."+fieldName } else { full = fieldName }
-        if replace { full = "" }
-        deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedAtPath(permitted, full), full)
+        deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedAtPath(permitted, full), path)
 
         // If an error occurred while deep-patching, bubble up immediately.
         if err != nil { return nil, err }

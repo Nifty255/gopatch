@@ -19,6 +19,7 @@ func TestDefault(t *testing.T) {
     Field3  bool
     Field4  TestEmbedded
     Field5  *TestEmbedded
+    Field6  map[string]int
   }
 
   t.Run("default-has-default-config", func(t *testing.T) {
@@ -97,9 +98,21 @@ func TestDefault(t *testing.T) {
       return
     }
 
-    // Test to see if the instance was patched.
+    // Test to see if the instance field list is correct.
     if len(result.Fields) != 1 || result.Fields[0] != "Field2" {
       t.Errorf("Expected patch result fields to contain exactly \"Field2\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+
+    // Test to see if the resulting field list is correct.
+    if len(result.Fields) != 1 || result.Fields[0] != "Field2" {
+      t.Errorf("Expected patch result fields to contain exactly \"Field2\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+
+    // Test to see if the resulting update map is correct.
+    if v, e := result.Map["Field2"]; !e || v != 255 {
+      t.Errorf("Expected patch result map to contain exactly \"Field2\": 255. Contained %v", result.Map)
       return
     }
   })
@@ -126,14 +139,20 @@ func TestDefault(t *testing.T) {
       return
     }
 
-    // Test to see if the instance was patched.
+    // Test to see if the instance field list is correct.
     if len(result.Fields) != 1 || result.Fields[0] != "Field4.Field1" {
       t.Errorf("Expected patch result fields to contain exactly \"Field4.Field1\". Contained [%v]", strings.Join(result.Fields, ", "))
       return
     }
+
+    // Test to see if the resulting update map is correct.
+    if v, e := result.Map["Field4.Field1"]; !e || v != "test" {
+      t.Errorf("Expected patch result map to contain exactly \"Field4.Field1\": \"test\". Contained %v", result.Map)
+      return
+    }
   })
 
-  t.Run("default-pointer-patches", func(t *testing.T) {
+  t.Run("default-nil-pointer-patches", func(t *testing.T) {
 
     testInstance := TestStruct{}
 
@@ -155,9 +174,62 @@ func TestDefault(t *testing.T) {
       return
     }
 
-    // Test to see if the instance was patched.
+    // Test to see if the resulting field list is correct.
     if len(result.Fields) != 1 || result.Fields[0] != "Field5.Field1" {
       t.Errorf("Expected patch result fields to contain exactly \"Field5.Field1\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+
+    // Test to see if the resulting update map is correct.
+    if v, e := result.Map["Field5.Field1"]; !e || v != "test" {
+      t.Errorf("Expected patch result map to contain exactly \"Field5.Field1\": \"test\". Contained %v", result.Map)
+      return
+    }
+  })
+
+  t.Run("default-map-patches", func(t *testing.T) {
+
+    testInstance := TestStruct{}
+
+    result, err := Default().Patch(&testInstance, map[string]interface{}{
+      "Field6": map[string]int{
+        "test1": 255,
+      },
+    })
+
+    // Test for unexpected errors.
+    if err != nil {
+      t.Errorf("Unexpected patch error: %q", err.Error())
+      return
+    }
+
+    // Test to see if the instance's map now exists.
+    if testInstance.Field6 == nil {
+      t.Errorf("Expected patch to only patch Field5.Field1. Patch affected struct so: %v", testInstance)
+      return
+    }
+
+    // Test to see if the map contains the expected data.
+    if v, e := testInstance.Field6["test1"]; !e || v != 255 {
+      t.Errorf("Expected patch to only patch Field6 (map) with \"test\": 255. Patch affected struct so: %v", testInstance)
+      return
+    }
+
+    // Test to see if the resulting field list is correct.
+    if len(result.Fields) != 1 || result.Fields[0] != "Field6" {
+      t.Errorf("Expected patch result fields to contain exactly \"Field6\". Contained [%v]", strings.Join(result.Fields, ", "))
+      return
+    }
+
+    // Test to see if the resulting update map is correct.
+    if v, e := result.Map["Field6"]; !e {
+      t.Errorf("Expected patch result map to contain exactly \"Field6\": map[string]interface{}{ \"test1\": 255 }. Contained %v (v didn't exist)", result.Map)
+      return
+    } else if vm, ok := v.(map[string]int); !ok {
+      t.Errorf("Expected patch result map to contain exactly \"Field6\": map[string]interface{}{ \"test1\": 255 }. Contained %v (v not map[string]int)", result.Map)
+      return
+    } else if sv, se := vm["test1"]; !se || sv != 255 {
+      t.Errorf("Expected patch result map to contain exactly \"Field6\": map[string]interface{}{ \"test1\": 255 }. Contained %v (sv didn't exist)", result.Map)
       return
     }
   })
