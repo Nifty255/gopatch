@@ -18,7 +18,7 @@ func New(config PatcherConfig) *Patcher {
   }
 }
 
-// Patch performs a patch operation on "dest", using the data in "patch". Patch returns a PatchResult if sucessful, or an error if not. Patch can
+// Patch performs a patch operation on "dest", using the data in "patch". Patch returns a PatchResult if successful, or an error if not. Patch can
 // also patch embedded structs and pointers to embedded structs. If a patch exists for a nil embedded struct pointer, the pointer will be assigned a
 // new zero-value struct before it is patched.
 func (p Patcher) Patch(dest interface{}, patch map[string]interface{}) (*PatchResult, error) {
@@ -77,7 +77,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
 
       // Check that the field isn't unpermitted by tag. Doing this before checking the permitted list placed priority on the tag.
       if fieldT.Tag.Get("gopatch") == "-" {
-        if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
+        if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "gopatch tag") }
         results.Unpermitted = append(results.Unpermitted, full)
         continue
       }
