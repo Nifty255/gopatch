@@ -10,8 +10,8 @@ type Patcher struct {
   config  PatcherConfig
 }
 
-// NewPatcher creates a new Patcher instance with the specified configuration. See `patcher_config.go`.
-func NewPatcher(config PatcherConfig) *Patcher {
+// New creates a new Patcher instance with the specified configuration. See `patcher_config.go`.
+func New(config PatcherConfig) *Patcher {
 
   return &Patcher{
     config: config,

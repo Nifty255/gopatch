@@ -6,7 +6,7 @@ var defaultPatcher Patcher
 
 func init() {
 
-  defaultPatcher = *NewPatcher(defaultConfig)
+  defaultPatcher = *New(defaultConfig)
 }
 
 // Default returns an instance of the default patcher.
