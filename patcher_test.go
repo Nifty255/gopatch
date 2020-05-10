@@ -8,10 +8,16 @@ import(
 
 func TestPatcher(t *testing.T) {
 
+  type TestDouble struct {
+    Field1  string
+    Field2  int
+  }
+
   type TestEmbedded struct {
     Field1  string
     Field2  int
     Field3  bool
+    Field4  TestDouble
   }
 
   type TestStruct struct {
@@ -400,7 +406,7 @@ func TestPatcher(t *testing.T) {
 
     // Test to see if the resulting update map is correct, and only contains the permitted field.
     if v, e := result.Map["Field5.Field2"]; !e || v != 255 || len(result.Map) > 1 {
-      t.Errorf("Expected patch result map to contain exactly \"Field5.Field2\": \"test\". Contained %v", result.Map)
+      t.Errorf("Expected patch result map to contain exactly \"Field5.Field2\": 255. Contained %v", result.Map)
       return
     }
   })
@@ -440,6 +446,47 @@ func TestPatcher(t *testing.T) {
     // Test to see if the resulting update map is correct, and only contains the permitted field.
     if v, e := result.Map["Field6"]; !e || reflect.ValueOf(v).Kind() != reflect.Map || len(result.Map) > 1 {
       t.Errorf("Expected patch result map to contain exactly \"Field6\": map. Contained %v", result.Map)
+      return
+    }
+  })
+
+  t.Run("embedded-double", func(t *testing.T) {
+
+    cfg := PatcherConfig{}
+
+    patcher := New(cfg)
+
+    testInstance := TestStruct{
+      Field4: TestEmbedded{
+        Field4: TestDouble{
+          Field1: "test",
+        },
+      },
+    }
+
+    result, err := patcher.Patch(&testInstance, map[string]interface{}{
+      "Field4": map[string]interface{}{
+        "Field4": map[string]interface{}{
+          "Field2": 255,
+        },
+      },
+    })
+
+    // Test for unexpected errors.
+    if err != nil {
+      t.Errorf("Unexpected patch error: %q", err.Error())
+      return
+    }
+
+    // Test to see if the instance was patched.
+    if testInstance.Field4.Field4.Field1 != "test" || testInstance.Field4.Field4.Field2 != 255 {
+      t.Errorf("Expected patch to only patch Field4.Field2. Patch affected struct so: %v", testInstance)
+      return
+    }
+
+    // Test to see if the resulting update map is correct, and only contains the permitted field.
+    if v, e := result.Map["Field4.Field4.Field2"]; !e || v != 255 || len(result.Map) > 1 {
+      t.Errorf("Expected patch result map to contain exactly \"Field4.Field4.Field2\": 255. Contained %v", result.Map)
       return
     }
   })

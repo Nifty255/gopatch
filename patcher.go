@@ -30,10 +30,10 @@ func (p Patcher) Patch(dest interface{}, patch map[string]interface{}) (*PatchRe
     
     return nil, errDestInvalid
   }
-  return p.patch(dest, patch, p.config.PermittedFields, p.config.EmbedPath)
+  return p.patch(dest, patch, p.config.PermittedFields, true)
 }
 
-func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted []string, path string) (*PatchResult, error) {
+func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted []string, root bool) (*PatchResult, error) {
   
   // Get the actual struct data from the pointer and its type data.
   valueOfDest := reflect.ValueOf(dest).Elem()
@@ -72,13 +72,10 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
     // Get the patch value based on the fieldName.
     if val, ok := patch[fieldName]; ok {
 
-      full := path
-      if full != "" { full += "."+fieldName } else { full = fieldName }
-
       // Check that the field isn't unpermitted by tag. Doing this before checking the permitted list placed priority on the tag.
       if fieldT.Tag.Get("gopatch") == "-" {
         if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "gopatch tag") }
-        results.Unpermitted = append(results.Unpermitted, full)
+        results.Unpermitted = append(results.Unpermitted, fieldName)
         continue
       }
 
@@ -104,7 +101,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
         // Skip field or error if it wasn't permitted.
         if !allowed {
           if p.config.UnpermittedErrors { return nil, errFieldUnpermitted(fieldName, "permitted array") }
-          results.Unpermitted = append(results.Unpermitted, full)
+          results.Unpermitted = append(results.Unpermitted, fieldName)
           continue
         }
       }
@@ -116,7 +113,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
         fieldV.Set(v)
         
         // Add data about the successful update to the results.
-        if err := p.saveToResults(&results, fieldT, val, path); err != nil { return nil, err }
+        if err := p.saveToResults(&results, fieldT, val, root); err != nil { return nil, err }
 
         // Next!
         continue
@@ -132,7 +129,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
       if updateSuccess {
 
         // Add data about the successful update to the results.
-        if err := p.saveToResults(&results, fieldT, val, path); err != nil { return nil, err }
+        if err := p.saveToResults(&results, fieldT, val, root); err != nil { return nil, err }
 
         // Next!
         continue
@@ -163,13 +160,13 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
 
         // Patch the field, even if it was reset, by recursion.
         if !fieldV.CanAddr() { continue }
-        deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedAtPath(permitted, full), path)
+        deep, err := p.patch(fieldV.Addr().Interface(), val.(map[string]interface{}), getPermittedInEmbedded(permitted, fieldName), false)
 
         // If an error occurred while deep-patching, bubble up immediately.
         if err != nil { return nil, err }
 
         // Merge deep-patched results into the current results.
-        if err := p.mergeResults(&results, deep, fieldT, replace, path); err != nil { return nil, err }
+        if err := p.mergeResults(&results, deep, fieldT, replace, root); err != nil { return nil, err }
       }
     }
   }
@@ -177,7 +174,7 @@ func (p Patcher) patch(dest interface{}, patch map[string]interface{}, permitted
   return &results, nil
 }
 
-func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch interface{}, path string) error {
+func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch interface{}, root bool) error {
 
   // Get a field name for the fields array.
   fieldName := dest.Name
@@ -190,6 +187,9 @@ func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch 
       return errFieldMissingTag(fieldName, p.config.UpdatedFieldSource)
     }
   }
+
+  // Prepend the embed path if this is root and there is an embed path.
+  if root && p.config.EmbedPath != "" { fieldName = p.config.EmbedPath+"."+fieldName }
 
   // Append.
   r.Fields = append(r.Fields, fieldName)
@@ -206,13 +206,16 @@ func (p *Patcher) saveToResults(r *PatchResult, dest reflect.StructField, patch 
     }
   }
 
-  // Add to map, prepended with a path if specified, otherwise with only the field name.
-  if path == "" { r.Map[fieldName] = patch } else { r.Map[path+"."+fieldName] = patch }
+  // Prepend the embed path if this is root and there is an embed path.
+  if root && p.config.EmbedPath != "" { fieldName = p.config.EmbedPath+"."+fieldName }
+
+  // Add to map.
+  r.Map[fieldName] = patch
 
   return nil
 }
 
-func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField, replace bool, path string) error {
+func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField, replace, root bool) error {
 
   // Get a field name for the fields array.
   fieldName := dest.Name
@@ -226,15 +229,15 @@ func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField,
     }
   }
 
-  full := path
-  if full != "" { full += "."+fieldName } else { full = fieldName }
+  // Prepend the embed path if this is root and there is an embed path.
+  if root && p.config.EmbedPath != "" { fieldName = p.config.EmbedPath+"."+fieldName }
 
   // Map field names to path and append.
   if replace {
-    top.Fields = append(top.Fields, path+"."+fieldName)
+    top.Fields = append(top.Fields, fieldName)
   } else {
     for _, field := range(deep.Fields) {
-      top.Fields = append(top.Fields, full+"."+field)
+      top.Fields = append(top.Fields, fieldName+"."+field)
     }
   }
 
@@ -250,33 +253,31 @@ func (p *Patcher) mergeResults(top, deep *PatchResult, dest reflect.StructField,
     }
   }
 
-  full = path
-  if full != "" { full += "."+fieldName } else { full = fieldName }
+  // Prepend the embed path if this is root.
+  if root && p.config.EmbedPath != "" { fieldName = p.config.EmbedPath+"."+fieldName }
 
   if replace {
-    top.Map[full] = deep.Map
+    top.Map[fieldName] = deep.Map
   } else {
     for k, v := range(deep.Map) {
-      top.Map[full+"."+k] = v
+      top.Map[fieldName+"."+k] = v
     }
   }
 
   return nil
 }
 
-func getPermittedAtPath(permitted []string, path string) []string {
+func getPermittedInEmbedded(permitted []string, fieldName string) []string {
 
   if len(permitted) == 0 { return []string{ "*" } }
-
-  if path == "" { return permitted }
 
   out := make([]string, 0, len(permitted))
 
   for _, permitted := range(permitted) {
 
-    if permitted == path+".*" { return []string{ "*" } }
+    if permitted == fieldName+".*" { return []string{ "*" } }
 
-    if strings.HasPrefix(permitted, path+".") { out = append(out, permitted[len(path)+1:])}
+    if strings.HasPrefix(permitted, fieldName+".") { out = append(out, permitted[len(fieldName)+1:])}
   }
 
   return out

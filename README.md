@@ -1,5 +1,5 @@
 # Go PATCH
-![Project status](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Project status](https://img.shields.io/badge/version-1.0.2-green.svg)
 [![Build Status](https://travis-ci.org/Nifty255/gopatch.svg?branch=master)](https://travis-ci.org/Nifty255/gopatch)
 [![Coverage Status](https://coveralls.io/repos/github/Nifty255/gopatch/badge.svg?branch=master)](https://coveralls.io/github/Nifty255/gopatch?branch=master)
 [![GoDoc](https://godoc.org/github.com/Nifty255/gopatch?status.svg)](https://godoc.org/github.com/Nifty255/gopatch)
