@@ -1,5 +1,8 @@
 # Go PATCH
-
+===
+![Project status](https://img.shields.io/badge/version-1.0.0-green.svg)
+[![Build Status](https://travis-ci.org/Nifty255/gopatch.svg?branch=master)](https://travis-ci.org/Nifty255/gopatch)
+[![Coverage Status](https://coveralls.io/repos/github/Nifty255/gopatch/badge.svg?branch=master)](https://coveralls.io/github/Nifty255/gopatch?branch=master)
 [![GoDoc](https://godoc.org/github.com/Nifty255/gopatch?status.svg)](https://godoc.org/github.com/Nifty255/gopatch)
 
 Go PATCH is a structure patching package designed for receiving HTTP PATCH requests with a body of data, and applying it to a structure without affecting any other data in it.
