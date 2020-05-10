@@ -13,9 +13,8 @@ type PatcherConfig struct {
   // .Patch(myUser, map[string]interface{}{
   //   "updated_at": "2020-01-01T00:00:00Z",
   // })
-  // .Map
   //
-  // // updates == map[string]interface{}{
+  // // updates.Map == map[string]interface{}{
   // //   "profile.metadata.updated_at": "2020-01-01T00:00:00Z",
   // // }
   //
@@ -95,9 +94,10 @@ type PatcherConfig struct {
   // .Patch(myUser, map[string]interface{}{
   //   "email_address": "myemail@address.com",
   //   "password_hash": "injectedhash"
-  // }).Fields
+  // })
   //
-  // // updates == []string{"email_address"}
+  // // updates.Fields == []string{"email_address"}
+  // // updates.Unpermitted == []string{"password_hash"}
   //
   // To permit all fields of an embedded struct, use `embedded.*`. All
   // fields found to be unpermitted will be stored in dot notation in
@@ -108,7 +108,8 @@ type PatcherConfig struct {
   // UnpermittedErrors causes the Patcher to immediately return an error
   // if a field is found to be unpermitted.
   //
-  // Note: All validation is performed before any patching, so an error
-  // will not cause a half-patched structure.
+  // WARNING: Using this option may result in half-patched structures!
+  // Only use this if you don't have further use of the half-patched
+  // structure or can reload it afterwards.
   UnpermittedErrors bool
 }
